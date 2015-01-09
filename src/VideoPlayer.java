@@ -47,6 +47,7 @@ class VideoPlayer extends BorderPane {
 
     private static final String PLAY_BUTTON_TEXT = "PLAY";
     private static final String PAUSE_BUTTON_TEXT = "PAUSE";
+    private static final String REPLAY_BUTTON_TEXT = "REPLAY";
     private static final String MUTE_BUTTON_TEXT = "MUTE";
     private static final String UNMUTE_BUTTON_TEXT = "UNMUTE";
 
@@ -58,7 +59,8 @@ class VideoPlayer extends BorderPane {
     private Slider myTimeSlider;
     private Label myTimeLabel;
     private Duration myDuration;
-    private boolean myVideoWillReplay = true;
+    private boolean myCycleCountIsIndefinite = false;
+    private boolean mySingleReplayEnabled = false;
     private HBox myMediaBar;
 
     public VideoPlayer (final MediaPlayer player) {
@@ -91,8 +93,8 @@ class VideoPlayer extends BorderPane {
 
     private void createAndDefineVisualComponents (final MediaPlayer player, final Button button) {
         button.setPrefWidth(BUTTON_WIDTH);
-        button.setOnAction(event->playOrPause(player));
-        player.currentTimeProperty().addListener(observable->updateValues());
+        button.setOnAction(event->playOrPause(player, button));
+        player.currentTimeProperty().addListener(observable->verifyValues());
 
         myTimeSlider = new Slider();
         HBox.setHgrow(myTimeSlider, Priority.ALWAYS);
@@ -104,9 +106,15 @@ class VideoPlayer extends BorderPane {
         myMediaBar.getChildren().addAll(button, new Label(SPACE), myTimeSlider, myTimeLabel);
     }
 
-    private void playOrPause (final MediaPlayer player) {
+    private void playOrPause (final MediaPlayer player, final Button button) {
         Status status = player.getStatus();
         if (status == Status.HALTED || status == Status.UNKNOWN) {
+            return;
+        }
+        if (mySingleReplayEnabled) {
+            mySingleReplayEnabled = false;
+            player.seek(player.getStartTime());
+            playVideo(player, button);
             return;
         }
         if (status == Status.PAUSED || status == Status.READY || status == Status.STOPPED) {
@@ -148,31 +156,34 @@ class VideoPlayer extends BorderPane {
     }
 
     private void defineMediaPlayerBehavior (final MediaPlayer player, final Button button) {
-        player.setCycleCount(myVideoWillReplay ? MediaPlayer.INDEFINITE : 1);
-        player.setOnPlaying(()->checkPlayerStatus(player, button));
-        player.setOnPaused(()->checkPlayerStatus(player, button));
+        player.setCycleCount(myCycleCountIsIndefinite ? MediaPlayer.INDEFINITE : 1);
+        player.setOnPlaying(()->playVideo(player, button));
+        player.setOnPaused(()->pauseVideo(player, button));
         player.setOnReady(()->runOnReady(player));
+        player.setOnEndOfMedia(()->displayReplayOption(player, button));
     }
 
-    private void checkPlayerStatus (final MediaPlayer player, final Button button) {
-        Status status = player.getStatus();
-        if (status == Status.HALTED || status == Status.PAUSED || status == Status.STOPPED) {
-            player.pause();
-            button.setText(PLAY_BUTTON_TEXT);
-        }
-        else {
-            player.play();
-            button.setText(PAUSE_BUTTON_TEXT);
-        }
+    private void playVideo (final MediaPlayer player, final Button button) {
+        player.play();
+        button.setText(PAUSE_BUTTON_TEXT);
+    }
+
+    private void pauseVideo (final MediaPlayer player, final Button button) {
+        player.pause();
+        button.setText(PLAY_BUTTON_TEXT);
     }
 
     private void runOnReady (final MediaPlayer player) {
         myDuration = player.getMedia().getDuration();
-        updateValues();
+        Platform.runLater(()->verifyValues());
     }
 
-    private void updateValues () {
-        Platform.runLater(()->verifyValues());
+    private void displayReplayOption (final MediaPlayer player, final Button button) {
+        if (!mySingleReplayEnabled) {
+            mySingleReplayEnabled = true;
+            player.pause();
+            button.setText(REPLAY_BUTTON_TEXT);
+        }
     }
 
     private void verifyValues () {
