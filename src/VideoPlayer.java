@@ -60,7 +60,7 @@ class VideoPlayer extends BorderPane {
     private Label myTimeLabel;
     private Duration myDuration;
     private boolean myCycleCountIsIndefinite = false;
-    private boolean mySingleReplayEnabled = false;
+    private boolean mySingleReplayEnabled = false; //odd errors when this is true, but perfect if false
     private HBox myMediaBar;
 
     public VideoPlayer (final MediaPlayer player) {
@@ -111,7 +111,7 @@ class VideoPlayer extends BorderPane {
         if (status == Status.HALTED || status == Status.UNKNOWN) {
             return;
         }
-        if (mySingleReplayEnabled) {
+        if (mySingleReplayEnabled) { //separate method?
             mySingleReplayEnabled = false;
             player.seek(player.getStartTime());
             playVideo(player, button);
@@ -122,6 +122,7 @@ class VideoPlayer extends BorderPane {
         }
         else {
             player.pause();
+            //pauseVideo(player, button); //which one is better?
         }
     }
 
@@ -160,7 +161,9 @@ class VideoPlayer extends BorderPane {
         player.setOnPlaying(()->playVideo(player, button));
         player.setOnPaused(()->pauseVideo(player, button));
         player.setOnReady(()->runOnReady(player));
-        player.setOnEndOfMedia(()->displayReplayOption(player, button));
+        if (!myCycleCountIsIndefinite) {
+            player.setOnEndOfMedia(()->displayReplayOption(player, button));
+        }
     }
 
     private void playVideo (final MediaPlayer player, final Button button) {
